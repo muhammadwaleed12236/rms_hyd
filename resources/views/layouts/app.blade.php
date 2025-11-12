@@ -50,7 +50,7 @@
                         <i class="fa-solid fa-utensils"></i>
                     </div>
                     <div>
-                        <h1 class="text-lg font-semibold">RMS</h1>
+                        <h1 class="text-lg font-semibold">ABQ</h1>
                         <p class="text-xs text-slate-300">Restaurant Management</p>
                     </div>
                 </a>
@@ -175,5 +175,6 @@
             }
         });
     </script>
+    @stack('scripts')
 </body>
 </html>

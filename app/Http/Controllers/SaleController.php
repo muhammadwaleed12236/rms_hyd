@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Item;
-use App\Models\Sale;
 use App\Models\Payment;
+use App\Models\Sale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -26,18 +26,21 @@ class SaleController extends Controller
             'total' => 'required|numeric|min:0',
             'cart' => 'required|array|min:1',
             'cart.*.item_id' => 'required|exists:items,id',
+            'cart.*.name' => 'required|string|max:255',
             'cart.*.size' => 'required|string',
+            'cart.*.size_id' => 'required|integer',
             'cart.*.price' => 'required|numeric|min:0',
             'cart.*.quantity' => 'required|integer|min:1',
+            'cart.*.total' => 'required|numeric|min:0',
             // Customer name required for dine_in/take_away, optional for delivery
             'customer_name' => [
                 function ($attribute, $value, $fail) use ($request) {
                     $type = $request->input('type');
-                    if (in_array($type, ['dine_in', 'take_away']) && (!is_string($value) || trim($value) === '')) {
+                    if (in_array($type, ['dine_in', 'take_away']) && (! is_string($value) || trim($value) === '')) {
                         $fail('Customer name is required for dine in and take away orders.');
                     }
                 },
-                'nullable', 'string', 'max:255'
+                'nullable', 'string', 'max:255',
             ],
             'customer_phone' => 'nullable|string|max:20',
             'customer_address' => 'nullable|string|max:500',
@@ -59,7 +62,9 @@ class SaleController extends Controller
             if (is_array($payments) && count($payments) > 0) {
                 foreach ($payments as $p) {
                     // Basic safety: ensure required keys exist
-                    if (empty($p['method']) || empty($p['amount'])) continue;
+                    if (empty($p['method']) || empty($p['amount'])) {
+                        continue;
+                    }
 
                     Payment::create([
                         'sale_id' => $sale->id,
@@ -76,13 +81,8 @@ class SaleController extends Controller
             return $sale;
         });
 
-        return response()->json([
-            'success' => true,
-            'id' => $sale->id,
-            'invoice_number' => $sale->invoice_number,
-            'total' => $sale->total,
-            'payments' => $sale->payments,
-        ], 201);
+        // Return the full sale object so the frontend can render receipts (includes cart, payments, timestamps)
+        return response()->json($sale->load('payments'), 201);
     }
 
     public function show(Sale $sale)
