@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Item;
 use App\Models\Payment;
 use App\Models\Sale;
@@ -12,81 +13,125 @@ class SaleController extends Controller
 {
     public function index()
     {
-        $items = Item::with('sizes', 'subcategory')->get();
-        // Load recent sales with payments for the sales list / payment flow
-        $sales = Sale::with('payments')->orderBy('created_at', 'desc')->limit(50)->get();
+        // Sales listing/history page
+        $sales = Sale::with('payments')->orderBy('created_at', 'desc')->paginate(20);
+       
+        return view('sales.index', compact('sales'));
+    }
 
-        return view('sales.index', compact('items', 'sales'));
+    public function create()
+    {
+        // POS page
+        $categories = Category::all();
+        $items = Item::with('sizes', 'subcategory')->get();
+
+        return view('pos.index', compact('categories', 'items'));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'type' => 'required|string|in:dine_in,take_away,delivery',
-            'total' => 'required|numeric|min:0',
-            'cart' => 'required|array|min:1',
-            'cart.*.item_id' => 'required|exists:items,id',
-            'cart.*.name' => 'required|string|max:255',
-            'cart.*.size' => 'required|string',
-            'cart.*.size_id' => 'required|integer',
-            'cart.*.price' => 'required|numeric|min:0',
-            'cart.*.quantity' => 'required|integer|min:1',
-            'cart.*.total' => 'required|numeric|min:0',
-            // Customer name required for dine_in/take_away, optional for delivery
-            'customer_name' => [
-                function ($attribute, $value, $fail) use ($request) {
-                    $type = $request->input('type');
-                    if (in_array($type, ['dine_in', 'take_away']) && (! is_string($value) || trim($value) === '')) {
-                        $fail('Customer name is required for dine in and take away orders.');
-                    }
-                },
-                'nullable', 'string', 'max:255',
-            ],
+            'items' => 'required|array|min:1',
+            'items.*.item_id' => 'required|exists:items,id',
+            'items.*.size_id' => 'required|exists:sizes,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.price' => 'required|numeric|min:0',
+            'sale_type' => 'required|string|in:dine_in,take_away,delivery',
+            'customer_name' => 'nullable|string|max:255',
             'customer_phone' => 'nullable|string|max:20',
             'customer_address' => 'nullable|string|max:500',
+            'delivery_charge' => 'nullable|numeric|min:0',
+            'payments' => 'nullable|array',
+            'payments.*.method' => 'required_with:payments|string|in:cash,easypaisa,jazzcash,bank',
+            'payments.*.amount' => 'required_with:payments|numeric|min:0.01',
+            'total_amount' => 'required|numeric|min:0',
         ]);
 
-        // Wrap creation in a transaction so payments are saved atomically with the sale
-        $sale = DB::transaction(function () use ($data, $request) {
+        // Delivery type requires customer details
+        if ($data['sale_type'] === 'delivery') {
+            if (! $data['customer_name'] || ! $data['customer_phone'] || ! $data['customer_address']) {
+                return response()->json([
+                    'message' => 'Customer details are required for delivery orders',
+                ], 422);
+            }
+        }
+
+        // Wrap creation in a transaction
+        $sale = DB::transaction(function () use ($data) {
+            // Build cart array from items
+            $cartItems = [];
+            foreach ($data['items'] as $item) {
+                $itemRecord = Item::findOrFail($item['item_id']);
+                $sizeRecord = $itemRecord->sizes()->findOrFail($item['size_id']);
+
+                $cartItems[] = [
+                    'item_id' => $item['item_id'],
+                    'name' => $itemRecord->name,
+                    'size' => $sizeRecord->size,
+                    'size_id' => $item['size_id'],
+                    'price' => $item['price'],
+                    'quantity' => $item['quantity'],
+                    'total' => $item['price'] * $item['quantity'],
+                ];
+            }
+
             $sale = Sale::create([
-                'type' => $data['type'],
-                'total' => $data['total'],
-                'cart' => $data['cart'],
+                'type' => $data['sale_type'],
+                'total' => $data['total_amount'],
+                'cart' => $cartItems,
                 'customer_name' => $data['customer_name'] ?? null,
                 'customer_phone' => $data['customer_phone'] ?? null,
                 'customer_address' => $data['customer_address'] ?? null,
+                'delivery_charge' => $data['delivery_charge'] ?? 0,
             ]);
 
-            // If frontend provided payments in payload, persist them and associate with the sale
-            $payments = $request->input('payments');
-            if (is_array($payments) && count($payments) > 0) {
-                foreach ($payments as $p) {
-                    // Basic safety: ensure required keys exist
-                    if (empty($p['method']) || empty($p['amount'])) {
-                        continue;
-                    }
-
+            // Create payment records if provided
+            if (! empty($data['payments'])) {
+                foreach ($data['payments'] as $p) {
                     Payment::create([
                         'sale_id' => $sale->id,
                         'method' => $p['method'],
                         'amount' => $p['amount'],
-                        'transaction_id' => $p['transaction_id'] ?? null,
                     ]);
                 }
             }
 
-            // Reload payments relationship
-            $sale->load('payments');
-
-            return $sale;
+            return $sale->load('payments');
         });
 
-        // Return the full sale object so the frontend can render receipts (includes cart, payments, timestamps)
-        return response()->json($sale->load('payments'), 201);
+        return response()->json($sale, 201);
     }
 
     public function show(Sale $sale)
     {
         return response()->json($sale);
+    }
+
+    public function addPayment(Request $request, Sale $sale)
+    {
+        $data = $request->validate([
+            'method' => 'required|string|in:cash,easypaisa,jazzcash,bank',
+            'amount' => 'required|numeric|min:0.01',
+        ]);
+
+        $totalPaid = $sale->payments()->sum('amount');
+        $remaining = $sale->total - $totalPaid;
+
+        if ($data['amount'] > $remaining) {
+            return response()->json([
+                'message' => 'Payment amount exceeds remaining balance',
+            ], 422);
+        }
+
+        Payment::create([
+            'sale_id' => $sale->id,
+            'method' => $data['method'],
+            'amount' => $data['amount'],
+        ]);
+
+        return response()->json([
+            'message' => 'Payment added successfully',
+            'sale' => $sale->load('payments'),
+        ], 201);
     }
 }

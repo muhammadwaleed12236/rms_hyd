@@ -18,6 +18,7 @@ class Sale extends Model
         'customer_name',
         'customer_phone',
         'customer_address',
+        'delivery_charge',
     ];
 
     protected $casts = [
@@ -42,8 +43,8 @@ class Sale extends Model
 
     public static function generateInvoiceNumber(): string
     {
-        $prefix = 'INV-' . now()->format('Ymd');
-        $lastInvoice = self::where('invoice_number', 'like', $prefix . '%')
+        $prefix = 'INV-'.now()->format('Ymd');
+        $lastInvoice = self::where('invoice_number', 'like', $prefix.'%')
             ->orderBy('invoice_number', 'desc')
             ->first();
 
@@ -54,6 +55,6 @@ class Sale extends Model
             $newNumber = '0001';
         }
 
-        return $prefix . '-' . $newNumber;
+        return $prefix.'-'.$newNumber;
     }
 }

@@ -8,10 +8,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let payments = [];
 
     const allItemsData = window.__ALL_ITEMS_DATA || [];
-    const csrfToken = window.CSRF_TOKEN || document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    const csrfToken = window.CSRF_TOKEN || (document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '');
 
     // Elements
     const itemSearch = document.getElementById('itemSearch');
+    const itemsGrid = document.getElementById('itemsGrid');
+    const categoryTabs = document.querySelectorAll('.category-tab');
+    const cartBadge = document.getElementById('cartBadge');
     const cartItems = document.getElementById('cartItems');
     const subtotalEl = document.getElementById('subtotal');
     const totalEl = document.getElementById('total');
@@ -74,6 +77,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Category filtering for POS view
+    categoryTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            categoryTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            const selectedCategory = tab.dataset.category;
+            document.querySelectorAll('.item-card').forEach(card => {
+                const cardCategory = card.dataset.category;
+                if (selectedCategory === 'all' || cardCategory == selectedCategory) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    });
+
+    // Update cart badge
+    const updateCartBadge = () => {
+        if (cartBadge) {
+            cartBadge.textContent = cart.length;
+        }
+    };
+
     // Item card click - add item directly to cart with default size (first size)
     document.addEventListener('click', (e) => {
         const itemCard = e.target.closest('.item-card');
@@ -110,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
         subtotalEl && (subtotalEl.textContent = `Rs. ${subtotal.toLocaleString()}`);
         totalEl && (totalEl.textContent = `Rs. ${subtotal.toLocaleString()}`);
         if (checkoutBtn) checkoutBtn.disabled = cart.length === 0;
+        updateCartBadge();
 
         if (!cartItems) return;
         cartItems.innerHTML = '';
@@ -189,12 +218,12 @@ document.addEventListener('DOMContentLoaded', () => {
             currentSaleType = btn.dataset.type;
 
             if (currentSaleType === 'delivery') {
-                deliverySection.classList.remove('hidden');
+                deliverySection && deliverySection.classList.remove('hidden');
             } else {
-                deliverySection.classList.add('hidden');
-                customerName.value = '';
-                customerPhone.value = '';
-                customerAddress.value = '';
+                deliverySection && deliverySection.classList.add('hidden');
+                if (customerName) customerName.value = '';
+                if (customerPhone) customerPhone.value = '';
+                if (customerAddress) customerAddress.value = '';
             }
         });
     });
@@ -261,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
             payments = [];
             currentSaleType = '';
             saleTypeBtns.forEach(b => b.classList.remove('border-blue-500', 'bg-blue-50'));
-            deliverySection.classList.add('hidden');
+            deliverySection && deliverySection.classList.add('hidden');
             updateCartUI();
             updatePaymentsUI();
             showToast('Cart cleared', 'success');
@@ -337,7 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
             payments = [];
             currentSaleType = '';
             saleTypeBtns.forEach(b => b.classList.remove('border-blue-500', 'bg-blue-50'));
-            deliverySection.classList.add('hidden');
+            deliverySection && deliverySection.classList.add('hidden');
             updateCartUI();
             updatePaymentsUI();
 
@@ -350,8 +379,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Success modal - New Sale button
     document.getElementById('newSaleBtn')?.addEventListener('click', () => {
-        successModal.classList.add('hidden');
-        successModal.classList.remove('flex');
+        if (successModal) {
+            successModal.classList.add('hidden');
+            successModal.classList.remove('flex');
+        }
         location.reload();
     });
 
@@ -433,17 +464,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         document.getElementById('invoiceContent').appendChild(viewBtn);
 
-        invoiceModal.classList.remove('hidden');
-        invoiceModal.classList.add('flex');
+        invoiceModal && invoiceModal.classList.remove('hidden');
+        invoiceModal && invoiceModal.classList.add('flex');
     };
-
-    closeInvoiceModal.addEventListener('click', () => {
-        invoiceModal.classList.add('hidden');
-        invoiceModal.classList.remove('flex');
+    
+    closeInvoiceModal?.addEventListener('click', () => {
+        if (invoiceModal) {
+            invoiceModal.classList.add('hidden');
+            invoiceModal.classList.remove('flex');
+        }
     });
 
-    invoiceModal.addEventListener('click', (e) => {
-        if (e.target === invoiceModal) closeInvoiceModal.click();
+    invoiceModal?.addEventListener('click', (e) => {
+        if (e.target === invoiceModal && closeInvoiceModal) closeInvoiceModal.click();
     });
 
     // Add payment for existing sale
@@ -456,25 +489,31 @@ document.addEventListener('DOMContentLoaded', () => {
             window.currentSaleId = saleId;
             window.currentRemaining = remaining;
 
-            document.getElementById('paymentModalRemaining').textContent = `Remaining: Rs. ${remaining.toLocaleString()}`;
-            document.getElementById('paymentAmountInput').value = remaining.toFixed(2);
-            document.getElementById('paymentAmountInput').max = remaining.toFixed(2);
+            const pmRem = document.getElementById('paymentModalRemaining');
+            const pmAmountInput = document.getElementById('paymentAmountInput');
+            if (pmRem) pmRem.textContent = `Remaining: Rs. ${remaining.toLocaleString()}`;
+            if (pmAmountInput) {
+                pmAmountInput.value = remaining.toFixed(2);
+                pmAmountInput.max = remaining.toFixed(2);
+            }
 
-            paymentModal.classList.remove('hidden');
-            paymentModal.classList.add('flex');
+            paymentModal && paymentModal.classList.remove('hidden');
+            paymentModal && paymentModal.classList.add('flex');
         }
     });
 
-    closePaymentModal.addEventListener('click', () => {
-        paymentModal.classList.add('hidden');
-        paymentModal.classList.remove('flex');
+    closePaymentModal?.addEventListener('click', () => {
+        if (paymentModal) {
+            paymentModal.classList.add('hidden');
+            paymentModal.classList.remove('flex');
+        }
     });
 
-    paymentModal.addEventListener('click', (e) => {
-        if (e.target === paymentModal) closePaymentModal.click();
+    paymentModal?.addEventListener('click', (e) => {
+        if (e.target === paymentModal && closePaymentModal) closePaymentModal.click();
     });
 
-    paymentForm.addEventListener('submit', async (e) => {
+    paymentForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const method = document.getElementById('paymentMethodSelect').value;
@@ -515,13 +554,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Receipt rendering and printing helpers
     const openReceiptModal = () => {
-        receiptModal.classList.remove('hidden');
-        receiptModal.classList.add('flex');
+        receiptModal && receiptModal.classList.remove('hidden');
+        receiptModal && receiptModal.classList.add('flex');
     };
 
     const closeReceiptModal = () => {
-        receiptModal.classList.add('hidden');
-        receiptModal.classList.remove('flex');
+        receiptModal && receiptModal.classList.add('hidden');
+        receiptModal && receiptModal.classList.remove('flex');
     };
 
     closeReceiptModalBtn?.addEventListener('click', closeReceiptModal);
@@ -582,7 +621,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         // Compact thermal receipt format (like 80mm paper)
-        printableReceipt.innerHTML = `
+            if (!printableReceipt) {
+                console.warn('printableReceipt element not found, skipping render');
+                return;
+            }
+
+            printableReceipt.innerHTML = `
             <div style="font-family:'Courier New',monospace;font-size:12px;line-height:1.6;width:100%;max-width:300px;margin:0 auto;padding:8px;">
                 <!-- HEADER -->
                 <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:8px;">
@@ -668,6 +712,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     printReceiptBtn?.addEventListener('click', () => {
+        if (!printableReceipt) {
+            showToast('Nothing to print', 'error');
+            return;
+        }
         printHtml(printableReceipt.innerHTML, 'Receipt');
     });
 

@@ -41,11 +41,11 @@
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
     <div class="flex h-screen">
-        <!-- Sidebar -->
-        <aside id="sidebar" class="w-64 bg-gradient-to-b from-slate-800 to-slate-900 text-white shadow-lg flex flex-col h-screen left-0 top-0 z-40 transform md:translate-x-0 -translate-x-full transition-transform duration-300">
+        <!-- Sidebar (Collapsed by default on all screen sizes, overlay style) -->
+        <aside id="sidebar" class="w-64 bg-gradient-to-b from-slate-800 to-slate-900 text-white shadow-lg flex flex-col h-screen left-0 top-0 z-40 fixed transform -translate-x-full transition-transform duration-300">
             <!-- Logo / Brand -->
-            <div class="p-6 border-b border-slate-700">
-                <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
+            <div class="p-6 border-b border-slate-700 flex items-center justify-between">
+                <a href="{{ route('dashboard') }}" class="flex items-center gap-3 flex-1">
                     <div class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center text-xl">
                         <i class="fa-solid fa-utensils"></i>
                     </div>
@@ -54,6 +54,10 @@
                         <p class="text-xs text-slate-300">Restaurant Management</p>
                     </div>
                 </a>
+                <!-- Close Sidebar Button -->
+                <button id="closeSidebarBtn" aria-label="Close sidebar" class="text-white hover:text-slate-300 text-2xl transition">
+                    <i class="fa-solid fa-times"></i>
+                </button>
             </div>
 
             <!-- Navigation -->
@@ -61,9 +65,10 @@
                 @php
                     $links = [
                         'dashboard' => ['icon' => 'fa-chart-simple', 'label' => 'Dashboard'],
+                        'pos.index' => ['icon' => 'fa-cash-register', 'label' => 'Point of Sale'],
+                        'sales.index' => ['icon' => 'fa-receipt', 'label' => 'Sales History'],
                         'categories.index' => ['icon' => 'fa-folder', 'label' => 'Categories'],
                         'items.index' => ['icon' => 'fa-utensils', 'label' => 'Items'],
-                        'sales.index' => ['icon' => 'fa-cash-register', 'label' => 'Sales'],
                         'payments.index' => ['icon' => 'fa-credit-card', 'label' => 'Payments'],
                         'expenses.index' => ['icon' => 'fa-file-invoice-dollar', 'label' => 'Expenses'],
                     ];
@@ -94,14 +99,12 @@
             <header class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-20">
                 <div class="flex items-center justify-between px-4 md:px-6 py-3">
                     <div class="flex items-center gap-3">
-                        <!-- Mobile Menu Button -->
-                        <button id="mobileMenuBtn" aria-label="Toggle menu" class="md:hidden text-slate-600 hover:text-slate-800 text-2xl">
+                        <!-- Menu Button (Always visible) -->
+                        <button id="mobileMenuBtn" aria-label="Toggle menu" class="text-slate-600 hover:text-slate-800 text-2xl">
                             <i class="fa-solid fa-bars"></i>
                         </button>
 
-                        <a href="{{ route('dashboard') }}" class="hidden md:inline-block">
-                            <h2 class="text-lg font-semibold text-slate-800">@yield('page-title', 'Dashboard')</h2>
-                        </a>
+                        <h2 class="text-lg font-semibold text-slate-800">@yield('page-title', 'Dashboard')</h2>
                     </div>
 
                     <!-- Right: Actions -->
@@ -127,8 +130,8 @@
                 </div>
             </header>
 
-            <!-- Page Content -->
-            <div class="p-4 md:p-6">
+            <!-- Page Content (Full Width) -->
+            <div class="w-full p-4 md:p-6">
                 @yield('content')
             </div>
         </main>
@@ -136,28 +139,35 @@
 
     <script>
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const closeSidebarBtn = document.getElementById('closeSidebarBtn');
         const sidebar = document.getElementById('sidebar');
         const sidebarOverlay = document.getElementById('sidebarOverlay');
         const userMenuBtn = document.getElementById('userMenuBtn');
         const userMenu = document.getElementById('userMenu');
 
+        // Open/toggle sidebar
         mobileMenuBtn?.addEventListener('click', () => {
             sidebar.classList.toggle('-translate-x-full');
             sidebarOverlay.classList.toggle('hidden');
         });
 
+        // Close sidebar button
+        closeSidebarBtn?.addEventListener('click', () => {
+            sidebar.classList.add('-translate-x-full');
+            sidebarOverlay.classList.add('hidden');
+        });
+
+        // Close sidebar via overlay
         sidebarOverlay?.addEventListener('click', () => {
             sidebar.classList.add('-translate-x-full');
             sidebarOverlay.classList.add('hidden');
         });
 
-        // Close sidebar when clicking on a link (mobile)
+        // Close sidebar when clicking on a link
         document.querySelectorAll('#sidebar a').forEach(link => {
             link.addEventListener('click', () => {
-                if (window.innerWidth < 768) {
-                    sidebar.classList.add('-translate-x-full');
-                    sidebarOverlay.classList.add('hidden');
-                }
+                sidebar.classList.add('-translate-x-full');
+                sidebarOverlay.classList.add('hidden');
             });
         });
 
